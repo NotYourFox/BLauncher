@@ -9,6 +9,7 @@ import subprocess
 import requests
 from tkinter import *
 from tkinter import ttk
+from time import sleep
 from tkinter import messagebox as mb
 from tkinter import simpledialog as sd
 import random
@@ -61,17 +62,6 @@ def downloader(url, name):
 	request = requests.get(url)
 	file.write(request.content)
 	file.close()
-
-def update_check():
-	version_code = requests.get("https://raw.githubusercontent.com/maxgrt/BLauncher/master/src/version_code.txt")
-	last = int(version_code.content.decode("utf-8"))
-	if last > VERSION_C:
-		thread1 = Thread(target=downloader, args=("https://github.com/maxgrt/BLauncher/archive/master.zip", "update.zip"))
-		thread1.start()
-		thread1.join()
-		root.destroy()
-		py_executable = sys.executable
-		os.system(py_executable + " update.py")
 
 def show_settings():
 	pass
@@ -137,23 +127,31 @@ def runner():
 		raise e
 
 def mojanglogin():
-	login = sd.askstring('BLauncher', lang.ask_mojang_login)
-	password = sd.askstring('BLauncher', lang.ask_mojang_password)
-	try:
-		login_data = minecraft_launcher_lib.account.login_user(login, password)
-		isl = True
+    login = sd.askstring('BLauncher', lang.ask_mojang_login)
+    password = sd.askstring('BLauncher', lang.ask_mojang_password)
+    try:
+        login_data = minecraft_launcher_lib.account.login_user(login, password)
+        isl = True
 		
-	except Exception as e:
-		logger(lang.error_during_login)
-		isl = False
-	if isl:
-		with open(os.path.join(path, 'profile.json'), 'w') as pj:
-			pj.write(json.dumps({
-				'nick': login_data["selectedProfile"]["name"],
-				'version': version.get(),
-				'uuid': login_data["selectedProfile"]["id"],
-				'accToken': login_data["accessToken"]
-				}))
+    except Exception as e:
+        logger(lang.error_during_login)
+        isl = False
+    if isl:
+        try:
+            exc = login_data["error"]
+            errmessage = login_data["errorMessage"]
+            if errmessage == 'Invalid credentials. Invalid username or password.':
+                logger('Invalid username or password.')
+        except KeyError as ke:
+            exc = None
+        if exc == None:
+            with open(os.path.join(path, 'profile.json'), 'w') as pj:
+                pj.write(json.dumps({
+			    	'nick': login_data["selectedProfile"]["name"],
+				    'version': version.get(),
+				    'uuid': login_data["selectedProfile"]["id"],
+				    'accToken': login_data["accessToken"]
+				    }))
 
 
 def update_check():
@@ -185,10 +183,13 @@ def createProfile():
 
 # =================== #
 #       TKINTER       #
-# =================== #
+# =================== 
 
+WIDTH = 1280 #Screen resolution settings.
+HEIGHT = 800
 root = Tk()
 root.title("BLauncher")
+root.minsize(width=WIDTH, height=HEIGHT)
 root.resizable(False, False)
 
 # MENUBAR
@@ -201,36 +202,46 @@ root.resizable(False, False)
 #menubar.add_cascade(label=lang.file, menu=file_menu)
 
 f_top = Frame(root)
-f_top.pack()
+f_top.place(width = WIDTH, relheight = 500/800)
 f_bottom = Frame(root)
-f_bottom.pack()
+f_bottom.place(rely=500/800, width = WIDTH, relheight = 300/800)
 
-log = Text(f_top, width=50, height=10,state='disabled', font='TkFixedFont')
-log.pack()
+log = Text(f_top, state='disabled', font='TkFixedFont {}'.format(int(20*(HEIGHT/800))))
+log.place(relx = 0.03125, rely = 0.125, relwidth = 0.9375, relheight = 0.72)
 progress = ttk.Progressbar(f_top, length=100)
-progress.pack(fill='x')
+progress.place(relwidth = 0.9375, relx = 0.03125, rely = 0.845)
+
+# SECTION OPTIONS
+f_account_relwidth = 0.3125 # 1280 -> 400, WIDTH -> f_width
+f_version_relwidth = 0.3125 # 1280 -> 400, WIDTH -> f_width
+f_run_relwidth = 0.078125 # 1280 -> 100, WIDTH -> f_width
+f_account_width = WIDTH*f_account_relwidth
+f_version_width = WIDTH*f_version_relwidth
+f_run_width = WIDTH*f_run_relwidth
+summary_width = f_account_width + f_version_width + f_run_width
+dmx = ((WIDTH - summary_width)/2 - 0.03125*WIDTH)/WIDTH
 
 # ACCOUNT SECTION
 f_account = LabelFrame(f_bottom, text=lang.account)
-f_account.pack(side=LEFT)
+f_account.place(relx = 0.03125 + dmx, width=f_account_width)
 
 txt1 = Label(f_account, text=lang.nick)
 txt1.pack()
-nick = Entry(f_account)
+nick = Entry(f_account, width = 25)
 nick.pack()
 mlogin = Button(f_account, text=lang.mojang_login, command=mojanglogin)
 mlogin.pack(fill='x')
 
 # VERSION SECTION
 f_version = LabelFrame(f_bottom, text=lang.version)
-f_version.pack(side=LEFT, fill='y')
+f_version.place(relx = 0.03125 + f_account_width/WIDTH + dmx, width = f_version_width)
 
 version = ttk.Combobox(f_version, values=ver_list)
 version.pack()
 
 # RUN SECTION
 f_run = LabelFrame(f_bottom, text=lang.run)
-f_run.pack(side=LEFT, fill='y')
+f_run.place(relx = 0.03125 + f_account_width/WIDTH + f_version_width/WIDTH + dmx, width = f_run_width)
 
 runbtn = Button(f_run, text=lang.run, comman=runner)
 runbtn.pack()
@@ -267,12 +278,12 @@ if not(os.path.isfile(os.path.join(path, 'launcher_profiles.json'))):
 		lp.write(jsonstr)
 
 logger('''
- ____  _      
-|  _ \| |     
-| |_) | |     
-|  _ <| |     
-| |_) | |____ 
-|____/|______|   v 0.2 by maxgrt
+ ____    __      
+|  _    \   |   |     
+| |_)   /   |   |     
+|  _  <    |   |     
+| |_)   \   |   |_____ 
+|____/   |_______|   v 0.2 by maxgrt
 	''')
 
 update_check()
